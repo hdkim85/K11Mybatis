@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+	Mapper를 만들때 아래 doctype이 필요한데 이는 배포사이트에서
+	가져온다.
+	https://mybatis.org/mybatis-3/getting-started.html
+ -->
+ 
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 
+속성
+	namespace 
+		: 해당 Mapper 파일을 호출하기 위해
+		정의한 인터페이스(서비스객체)의 패키지를 포함한
+		풀경로를 기술한다. 
+	id 
+		: 실제 호출되는 함수명과 동일한 이름으로 기술한다. 
+	resultType 
+		: 쿼리 실행 후 반환디는 값의 타입을 명시한다.
+	parameterType 
+		: 쿼리문에서 사용할 파라미터를 저장한 객체(DTO 혹은 VO)의
+		타입을 명시한다.
+ --> 
+ 
+ <!-- 
+ Mybatis 쿼리성공시 반환값
+ 
+ select : select문에 해당하는 결과를 반환한다. 아래와 같이
+ 	select의 결과가 MyBoardDTO타입이라면 패키지명을 포함한
+ 	클래스의 경로를 resultType에 기술한다.
+ 	만약 여러개의 레코드가 반환되면 List계열의 컬렉션에
+ 	저장되어 반환된다.
+ 	
+ insert : 입력 성공시 1, 실패시 0을 반환한다. 만약 insert가
+ 	여러번 되더라도 성공시에는 1을 반환하게 된다.
+  -->
+
+<mapper namespace = "mybatis.MybatisDAOImpl">
+	
+	<!-- 방명록 리스트 : 게시물 갯수 카운트 -->	
+	<select id="getTotalCount" resultType="int">
+		SELECT COUNT(*) FROM myboard
+	</select>
+	
+	<!-- 방명록리스트 : start와 end에 해당하는 게시물 가져오기 -->
+	<select id="listPage" resultType="mybatis.MyBoardDTO">
+		SELECT * FROM (
+			SELECT Tb.*, rownum rNum FROM (
+				SELECT * FROM myboard ORDER BY idx DESC
+			) Tb 
+		) 
+		WHERE rNum BETWEEN #{param1} AND #{param2}
+	</select>
+	
+	<insert id="write">
+		INSERT INTO myboard(idx, id, name, contents)
+		VALUES
+		(myboard_seq.nextval, #{_id}, #{_name}, #{_contents})
+	</insert>
+	
+	<!-- 
+		매개변수로 전달된 DTO객체의 멤버변수명만 명시하면
+		내부적으로 getter()를 호출하여 값을 얻어올 수 있다.
+		(EL과 동일한 기능)
+	 -->
+	<select id="view" resultType="mybatis.MyBoardDTO"
+		parameterType="mybatis.ParameterDTO">
+		SELECT * FROM myboard WHERE idx=#{board_idx}
+			AND id=#{user_id}
+	</select>
+	
+	<update id="modify" parameterType="mybatis.MyBoardDTO">
+		UPDATE myboard
+			SET name=#{name}, contents=#{contents}
+			WHERE idx=#{idx} AND id=#{id}
+	</update>
+	
+</mapper>
