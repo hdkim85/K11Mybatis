@@ -35,23 +35,56 @@
  	
  insert : 입력 성공시 1, 실패시 0을 반환한다. 만약 insert가
  	여러번 되더라도 성공시에는 1을 반환하게 된다.
+ update/delete : 수정/삭제에 성공한 행의 갯수를 반환한다.
+ 	조건에 따라 여러개의 레코드가 적용될 수 있으므로
+ 	0, 1 이 아닌 더 큰 값이 반환될수도 있다. 실패의 경우
+ 	0이 반환된다.
   -->
 
 <mapper namespace = "mybatis.MybatisDAOImpl">
 	
 	<!-- 방명록 리스트 : 게시물 갯수 카운트 -->	
-	<select id="getTotalCount" resultType="int">
-		SELECT COUNT(*) FROM myboard
+	
+<!-- 	<select id="getTotalCount" resultType="int">
+		SELECT COUNT(*) FROM myboard 
+	</select> -->
+	<select id="getTotalCount" parameterType="mybatis.ParameterDTO" resultType="int">
+		SELECT COUNT(*) FROM myboard		
+		<if test="searchTxt!=null and !searchTxt.equals('')">
+		WHERE ${searchField} like '%'|| #{searchTxt} ||'%'
+		</if>
 	</select>
 	
 	<!-- 방명록리스트 : start와 end에 해당하는 게시물 가져오기 -->
-	<select id="listPage" resultType="mybatis.MyBoardDTO">
+	
+<!-- 	<select id="listPage" resultType="mybatis.MyBoardDTO">
 		SELECT * FROM (
 			SELECT Tb.*, rownum rNum FROM (
 				SELECT * FROM myboard ORDER BY idx DESC
 			) Tb 
 		) 
 		WHERE rNum BETWEEN #{param1} AND #{param2}
+	</select> -->
+	
+	
+	<!-- 
+		검색어처리 : 검색어가 있는 경우와 없는경우를 구분하여 동적쿼리로
+			처리하고 싶을때 아래와 같이 if문을 사용한다. 사용법은 JSTL과
+			동일하다. 
+			< if test='조건' >			
+	 -->
+	<select id="listPage" parameterType="mybatis.ParameterDTO" resultType="mybatis.MyBoardDTO">
+		SELECT * FROM (
+			SELECT Tb.*, rownum rNum FROM (
+				SELECT * FROM myboard 
+				<if test="searchTxt!=null and !searchTxt.equals('')">
+					WHERE ${searchField} like '%' || #{searchTxt} ||'%'
+				</if>
+				ORDER BY idx DESC
+			) Tb 
+		) 
+		WHERE rNum BETWEEN #{start} AND #{end}
+		
 	</select>
 	
 	<insert id="write">
@@ -65,16 +98,18 @@
 		내부적으로 getter()를 호출하여 값을 얻어올 수 있다.
 		(EL과 동일한 기능)
 	 -->
+	 <!-- 수정폼 로딩과 수정처리하기 -->
 	<select id="view" resultType="mybatis.MyBoardDTO"
 		parameterType="mybatis.ParameterDTO">
 		SELECT * FROM myboard WHERE idx=#{board_idx}
 			AND id=#{user_id}
 	</select>
-	
 	<update id="modify" parameterType="mybatis.MyBoardDTO">
 		UPDATE myboard
 			SET name=#{name}, contents=#{contents}
 			WHERE idx=#{idx} AND id=#{id}
 	</update>
-	
+	<delete id="delete">
+		DELETE FROM myboard WHERE idx=#{param1} AND id=#{param2}
+	</delete>
 </mapper>

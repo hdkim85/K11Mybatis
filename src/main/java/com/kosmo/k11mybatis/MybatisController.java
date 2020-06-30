@@ -18,6 +18,7 @@ import mybatis.MyBoardDTO;
 import mybatis.MybatisDAOImpl;
 import mybatis.MybatisMemberImpl;
 import mybatis.ParameterDTO;
+import util.EnvFileReader;
 import util.PagingUtil;
 
 @Controller
@@ -35,14 +36,35 @@ public class MybatisController {
 	//방명록 리스트
 	@RequestMapping("/mybatis/list.do")
 	public String list(Model model, HttpServletRequest req) {
-				
-		int totalRecordCount =
+		/*
+		 req로 받음 -> getTotalcount로 넘겨 게시물 수 계산
+		 -> listpage로도 파라미터 넘김
+		 각각 파라미터 2개씩 늘어남 -> DTO 만드는게 나음
+		 parameterDTO
+		 */
+		
+		
+		
+		int totalRecordCount = 0;
+		ParameterDTO parameterDTO = new ParameterDTO();		
+	
+		String searchField = req.getParameter("searchField");
+		String searchTxt = req.getParameter("searchTxt");
+	
+		parameterDTO.setSearchField(searchField);
+		parameterDTO.setSearchTxt(searchTxt);
+		System.out.println("검색어:" + parameterDTO.getSearchTxt());
+		
+		totalRecordCount =
 				sqlSession.getMapper(MybatisDAOImpl.class)
-					.getTotalCount();
+					.getTotalCount(parameterDTO);
+
+		
+	
 		
 		//페이지 처리를 위한 설정값.(Environment 이용해서 외부파일로 써야함)
-		int pageSize = 4;
-		int blockPage = 2;
+		int pageSize = Integer.parseInt(EnvFileReader.getValue("SpringBbsInit.properties", "springBoard.pageSize"));
+		int blockPage = Integer.parseInt(EnvFileReader.getValue("SpringBbsInit.properties", "springBoard.blockPage"));
 		
 		//전체 페이지 수 계산
 		int totalPage =
@@ -53,11 +75,14 @@ public class MybatisController {
 			Integer.parseInt(req.getParameter("nowPage"));
 		int start = (nowPage-1)*pageSize+1;
 		int end = nowPage*pageSize;
+		//위에서 계산한 start, end를 DTO에 저장
+		parameterDTO.setStart(start);
+		parameterDTO.setEnd(end);
 		
 		//리스트 페이지에 출력할 게시물 가져오기
 		ArrayList<MyBoardDTO> lists =
 				sqlSession.getMapper(MybatisDAOImpl.class)
-					.listPage(start, end);
+					.listPage(parameterDTO);
 		
 		//페이지 번호에 대한 처리
 		String pagingImg =
@@ -198,20 +223,35 @@ public class MybatisController {
 		
 	}
 	
+	//수정처리하기
 	@RequestMapping("/mybatis/modifyAction.do")
 	public String modifyAction(MyBoardDTO myBoardDTO, HttpSession session) {
-		
+		//로그인 확인
 		if(session.getAttribute("siteUserInfo")==null) {
 			
 			//model.addAttribute("backUrl", "08Mybatis/modify");
 			return "redirect:login.do";
 		}
-		
-		sqlSession.getMapper(MybatisDAOImpl.class).modify(myBoardDTO);
+		//커맨드객체로 폼값을 한번에 받아서 Mapper로 전달함
+		int applyRow = sqlSession.getMapper(MybatisDAOImpl.class).modify(myBoardDTO);
+		System.out.println("수정처리된 레코드 수 :" + applyRow);
 		
 		return "redirect:list.do";
 	}
 	
+	//삭제처리
+	@RequestMapping("/mybatis/delete.do")
+	public String delete(HttpServletRequest req, HttpSession session) {
+		
+		if(session.getAttribute("siteUserInfo")==null) {
+			return "redirect:login.do";
+		}
+		
+		sqlSession.getMapper(MybatisDAOImpl.class).delete(
+				req.getParameter("idx"), 
+				((MemberVO)session.getAttribute("siteUserInfo")).getId());
+		return "redirect:list.do";
+	}
 	
 	
 }

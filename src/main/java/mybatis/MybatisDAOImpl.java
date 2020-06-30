@@ -15,8 +15,10 @@ public interface MybatisDAOImpl {
 	 아래 추상메소드를 통해 컨트롤러는 Mapper의 각 엘리먼트를
 	 호출하게 된다.
 	 */
-	public int getTotalCount();
-	public ArrayList<MyBoardDTO> listPage(int s, int e);
+//	public int getTotalCount();
+	public int getTotalCount(ParameterDTO parameterDTO);
+	
+	public ArrayList<MyBoardDTO> listPage(ParameterDTO parameterDTO);
 	
 	/*
 	 방명록 글쓰기
@@ -30,7 +32,9 @@ public interface MybatisDAOImpl {
 	
 	//수정폼 로딩하기
 	public MyBoardDTO view(ParameterDTO parameterDTO);
-	
+	//수정처리하기
 	public int modify(MyBoardDTO myBoardDTO);
+	//삭제처리하기
+	public int delete(String idx, String id);
 	
 }
