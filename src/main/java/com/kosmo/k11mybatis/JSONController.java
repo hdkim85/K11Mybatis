@@ -1,7 +1,11 @@
 package com.kosmo.k11mybatis;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
+import javax.annotation.Resource;
+import javax.print.DocFlavor.STRING;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
@@ -11,6 +15,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 
 import mybatis.MemberVO;
@@ -22,28 +27,24 @@ import util.EnvFileReader;
 import util.PagingUtil;
 
 @Controller
-public class MybatisController {
+public class JSONController {
 	
-	/*
-	 sevlet-context.xml에서 생성한 빈을 자동으로 주입받아 Mybatis를
-	 사용할 준비를 한다. @Autowired는 타입만 일치하면 자동주입
-	 받을 수 있다.
-	 */
-	
+	//Mybatis를 사용하기 위해 빈 자동주입
 	@Autowired
 	private SqlSession sqlSession;
 	
-	//방명록 리스트
-	@RequestMapping("/mybatis/list.do")
-	public String list(Model model, HttpServletRequest req) {
-		/*
-		 req로 받음 -> getTotalcount로 넘겨 게시물 수 계산
-		 -> listpage로도 파라미터 넘김
-		 각각 파라미터 2개씩 늘어남 -> DTO 만드는게 나음
-		 parameterDTO
-		 */
+	//방명록 게시판의 틀이 되는 페이지
+	@RequestMapping("/mybatisJSON/list.do")
+	public String board() {
 		
-		
+		return "08Json/board";
+	}
+	/*
+	 방명록 게시판의 실제 반복 리스트 부분을 출력함.
+	 해당 페이지는 위 list.do로 Ajax를 통해 load되어 출력됨.
+	 */
+	@RequestMapping("/mybatisJSON/aList.do")
+	public String aList(Model model, HttpServletRequest req) {
 		
 		int totalRecordCount = 0;
 		ParameterDTO parameterDTO = new ParameterDTO();		
@@ -84,12 +85,12 @@ public class MybatisController {
 				sqlSession.getMapper(MybatisDAOImpl.class)
 					.listPage(parameterDTO);
 		
-		//페이지 번호에 대한 처리
+		//페이지 번호에 대한 처리 : Ajax로 처리하기 위해 메소드 변경
 		String pagingImg =
-				PagingUtil.pagingImg(
+				PagingUtil.pagingAjax(
 						totalRecordCount,
 						pageSize, blockPage, nowPage,
-						req.getContextPath()+"/mybatis/list.do?");
+						req.getContextPath());
 		model.addAttribute("pagingImg", pagingImg);
 		
 		//레코드에 대한 가공을 위해 for문으로 반복
@@ -101,52 +102,64 @@ public class MybatisController {
 		}
 		//model 객체에 저장
 		model.addAttribute("lists", lists);
-		return "08Mybatis/list";
+		
+		return "08Json/aList";
+		
+	}
+	
+	@RequestMapping("/mybatisJSON/login.do")
+	public String login() {
+		
+		
+		
+		return "08Json/login";
 	}
 	
 	
-	
-	@RequestMapping("/mybatis/login.do")
-	public String login(Model model) {
-		return "08Mybatis/login";
-	}
-	
-	@RequestMapping("/mybatis/loginAction.do")
-	public ModelAndView loginAction(
-			HttpServletRequest req, HttpSession session) {
-		//로그인 메소드를 호출함
+	@RequestMapping("/mybatisJSON/loginAction.do")
+	@ResponseBody
+	public Map<String, Object> loginAction(HttpServletRequest req,
+			HttpSession session){
+		
+		Map<String, Object> map = new HashMap<String, Object>();
+		
 		MemberVO vo =
 				sqlSession.getMapper(MybatisMemberImpl.class).login(
 						req.getParameter("id"), 
 						req.getParameter("pass")
 						);
 		
-		ModelAndView mv = new ModelAndView();
 		
 		if(vo==null) {
 			//로그인에 실패한 경우
-			mv.addObject("LoginNG", "아이디/패스워드가 틀렸습니다.");
-			mv.setViewName("08Mybatis/login");
-			return mv;
+			map.put("loginResult", 0);
+			map.put("loginMessage", "로그인 실패");
+
 		}
 		else {
-			//로그인에 성공한 경우 세션영역에 VO객체를 저장한다.
 			session.setAttribute("siteUserInfo", vo);
+			map.put("loginResult", 1);
+			map.put("loginMessage", "로그인 성공");
 		}
 		
-		String backUrl = req.getParameter("backUrl");
-		if(backUrl == null || backUrl.equals("")) {
-			//돌아갈 페이지가 없다면 로그인 페이지로 이동한다.
-			mv.setViewName("08Mybatis/login");
-		}
-		else {
-			//지정된 페이지로 이동한다.
-			mv.setViewName(backUrl);
-		}
-		return mv;
+		
+		return map;
+		
+		
+		
 	}
 	
-	@RequestMapping("/mybatis/write.do")
+	//로그아웃
+	@RequestMapping("/mybatisJSON/logout.do")
+	public String logout(HttpSession session) {
+
+		session.setAttribute("siteUserInfo", null);
+		return "redirect:login.do";
+	}
+	
+	
+	
+	@RequestMapping("/mybatisJSON/write.do")
 	public String write(Model model, HttpSession session,
 			HttpServletRequest req) {
 		//글쓰기 페이지로 진입시 세션영역에 데이터가 없다면 로그인 페이지로 이동
@@ -155,16 +168,16 @@ public class MybatisController {
 			 로그인에 성공할 경우 글쓰기 페이지로 이동하기 위해
 			 돌아갈 경로를 아래와 같이 저장함.
 			 */
-			model.addAttribute("backUrl", "08Mybatis/write");
+			model.addAttribute("backUrl", "08Json/write");
 			return "redirect:login.do";
 			
 		}
-		return "08Mybatis/write";
+		return "08Json/write";
 	}
 	
 	
 	
-	@RequestMapping(value="/mybatis/writeAction.do",
+	@RequestMapping(value="/mybatisJSON/writeAction.do",
 			method=RequestMethod.POST)
 	public String writeAction(Model model, HttpServletRequest req,
 			HttpSession session) {
@@ -192,70 +205,44 @@ public class MybatisController {
 		
 	}
 	
-	
-	//로그아웃
-	@RequestMapping("/mybatis/logout.do")
-	public String logout(HttpSession session) {
-		//세션영역을 비워준다.
-		session.setAttribute("siteUserInfo", null);
-		return "redirect:login.do";
-	}
-	
-	@RequestMapping("/mybatis/modify.do")
-	public String modify(Model model, HttpServletRequest req,
-			HttpSession session) {
+	//삭제처리의 결과를 JSON으로 반환
+	@RequestMapping("/mybatisJSON/deleteAction.do")
+	@ResponseBody
+	public Map<String, Object> deleteAction(
+			HttpServletRequest req, HttpSession session){
+		Map<String, Object> map =
+				new HashMap<String, Object>();
+		
+		//로그인 되었는지 확인
 		if(session.getAttribute("siteUserInfo")==null) {
-			
-			return "redirect:login.do";
-		}
-		/*
-		 여러개의 폼값을 한번에 Mapper쪽으로 전달하기 위해
-		 DTO 객체를 사용한다. 해당 객체는 Mapper에서 즉시
-		 사용할 수 있다.
-		 */
-		ParameterDTO parameterDTO = new ParameterDTO() ;
-		parameterDTO.setBoard_idx(req.getParameter("idx"));//일련번호
-		parameterDTO.setUser_id(
-				((MemberVO)session.getAttribute("siteUserInfo")).getId());//사용자아이디
-		
-		//Mybatis 호출시 DTO객체를 파라미터로 전달
-		MyBoardDTO dto =
-				sqlSession.getMapper(MybatisDAOImpl.class).view(parameterDTO);
-		
-		model.addAttribute("dto", dto);
-		return "08Mybatis/modify";
-		
-	}
-	
-	//수정처리하기
-	@RequestMapping("/mybatis/modifyAction.do")
-	public String modifyAction(MyBoardDTO myBoardDTO, HttpSession session) {
-		//로그인 확인
-		if(session.getAttribute("siteUserInfo")==null) {
-			
-			//model.addAttribute("backUrl", "08Mybatis/modify");
-			return "redirect:login.do";
-		}
-		//커맨드객체로 폼값을 한번에 받아서 Mapper로 전달함
-		int applyRow = sqlSession.getMapper(MybatisDAOImpl.class).modify(myBoardDTO);
-		System.out.println("수정처리된 레코드 수 :" + applyRow);
-		
-		return "redirect:list.do";
-	}
-	
-	//삭제처리
-	@RequestMapping("/mybatis/delete.do")
-	public String delete(HttpServletRequest req, HttpSession session) {
-		
-		if(session.getAttribute("siteUserInfo")==null) {
-			return "redirect:login.do";
+			map.put("statusCode", 1);
+			return map;
 		}
 		
-		sqlSession.getMapper(MybatisDAOImpl.class).delete(
+		//매퍼 호출 - 삭제처리
+		int result = sqlSession.getMapper(MybatisDAOImpl.class).delete(
 				req.getParameter("idx"), 
-				((MemberVO)session.getAttribute("siteUserInfo")).getId());
-		return "redirect:list.do";
+				((MemberVO)session.getAttribute("siteUserInfo")).getId()
+				);
+		
+		/*
+		 Mybatis사용시 delete쿼리를 실행하게되면 처리후 실제 삭제된
+		 행의 갯수를 반환한다. 이를 통해 컨트롤러에서는 성공/실패
+		 여부를 판단할 수 있다.
+		 */
+		if(result<=0) {
+			//삭제실패시
+			map.put("statusCode", 0);
+		}
+		else{
+			//삭제성공시
+			map.put("statusCode", 2);
+		}
+		
+		return map;
 	}
+	
+	
 	
 	
 }
